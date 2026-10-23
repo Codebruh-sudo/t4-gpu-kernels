@@ -1,0 +1,24 @@
+# compiled binaries
+*.o
+*.out
+*.exe
+flash1
+flash2
+flash3
+gemm_tiled
+gemm_reg
+gemm_wmma
+gemm_fast
+gemv1
+sweep
+ffn1
+ffn4
+softmax_opt
+fusion_rms
+fusion_lt
+# profiler reports
+*.ncu-rep
+*.nsys-rep
+# python
+__pycache__/
+*.pyc
