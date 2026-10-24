@@ -1,20 +1,5 @@
-// =====================================================================
+
 // LEARNING STEP 1: tiled GEMM with shared memory (fp32, CUDA cores)
-//
-//   C[N][N] = A[N][N] * B[N][N]      row-major,  N = 2048
-//
-// Contenders:
-//   naive      : each thread computes one C value, reads A and B straight
-//                from global memory (every value fetched N times)
-//   tiled<16>  : 16x16 blocks share tiles of A and B in shared memory
-//   tiled<32>  : same idea, 32x32 tiles (1024 threads per block)
-//   cuBLAS     : cublasSgemm, the target
-//
-// T4 fp32 peak (CUDA cores) is about 8.1 TFLOP/s.
-//
-// compile:  nvcc -O3 -arch=sm_75 gemm_tiled.cu -o gemm_tiled -lcublas
-// run:      ./gemm_tiled
-// =====================================================================
 
 #include <cstdio>
 #include <cstdlib>
@@ -32,7 +17,7 @@
 constexpr int N = 2048;
 constexpr double PEAK_TFLOPS = 8.1;   // T4 fp32
 
-// ------------------------------ naive --------------------------------
+//  naive
 // One thread = one C value. Reads a full row of A and a full column of B
 // from global memory.
 __global__ void matmul_naive(const float* A, const float* B, float* C) {
@@ -46,9 +31,9 @@ __global__ void matmul_naive(const float* A, const float* B, float* C) {
     }
 }
 
-// ------------------------------ tiled --------------------------------
+// tiled
 // A block of TILE x TILE threads computes a TILE x TILE piece of C.
-// It walks along K one tile at a time:
+// It walks along K one tile at a time-
 //   1. every thread loads ONE value of the A tile and ONE of the B tile
 //   2. wait until the whole tile is on the "table"   (__syncthreads)
 //   3. every thread does TILE multiply-adds from shared memory
@@ -74,12 +59,12 @@ __global__ void matmul_tiled(const float* A, const float* B, float* C) {
 #pragma unroll
         for (int k = 0; k < TILE; k++)
             sum += As[ty][k] * Bs[k][tx];
-        __syncthreads();                  // step 4: everyone done before overwrite
+        __syncthreads();                  // step 4- everyone done before overwrite
     }
     C[row * N + col] = sum;
 }
 
-// ------------------------------ timing --------------------------------
+// timing
 template <typename F>
 float timeIt(F launch, int iters = 10) {
     launch();                                  // warm-up

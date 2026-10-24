@@ -1,21 +1,6 @@
-// =====================================================================
+
 // LEARNING STEP 4: faster tensor-core GEMM (WMMA) on the T4
-//
-//   C[N][N] (fp32) = A[N][N] (fp16) * B[N][N] (fp16)     row-major, N = 4096
-//
-// Upgrades over step 3 ("wmma shared", 64x64 block, 2x2 fragments/warp):
-//   1. BIGGER TILES:  block 128x128, 8 warps, each warp 32x64 of C
-//                     = 2x4 = 8 tensor-core tiles per warp (more reuse)
-//   2. DOUBLE BUFFERING: two shared-memory buffers. While the tensor cores
-//                     work on buffer "cur", the next tile is already being
-//                     fetched from global memory into registers, then
-//                     stored into buffer "next" after the math.
-//                     (The T4 has no cp.async, so the prefetch goes
-//                      global -> registers -> shared.)
-//
-// compile:  nvcc -O3 -arch=sm_75 gemm_wmma_fast.cu -o gemm_fast -lcublas
-// run:      ./gemm_fast
-// =====================================================================
+
 
 #include <cstdio>
 #include <cstdlib>
@@ -38,7 +23,7 @@ constexpr int N = 4096;
 constexpr int WM = 16, WN = 16, WK = 16;
 constexpr double PEAK_TFLOPS = 65.0;
 
-// ===================== step 3 kernel (for comparison) ==================
+// step 3 kernel (for comparison)
 namespace s3 {
 constexpr int BM = 64, BN = 64, BK = 32, PAD = 8;
 constexpr int LDA_S = BK + PAD, LDB_S = BN + PAD, THREADS = 128;
@@ -85,7 +70,7 @@ wmma_shared(const half* A, const half* B, float* C) {
 }
 }  // namespace s3
 
-// ========================= step 4: the fast kernel =====================
+// step 4: the fast kernel
 constexpr int BM = 128, BN = 128, BK = 32;
 constexpr int PAD = 8;
 constexpr int LDA_S = BK + PAD;          // 40 halves per As row
@@ -101,8 +86,8 @@ wmma_fast(const half* A, const half* B, float* C) {
 
     int tid     = threadIdx.x;
     int warpId  = tid / 32;
-    int warpRow = warpId / 2;            // 0..3 -> rows warpRow*32
-    int warpCol = warpId % 2;            // 0..1 -> cols warpCol*64
+    int warpRow = warpId / 2;            // 0..3 - rows warpRow*32
+    int warpCol = warpId % 2;            // 0..1 - cols warpCol*64
     int blockRow = blockIdx.y * BM;
     int blockCol = blockIdx.x * BN;
 
@@ -132,7 +117,7 @@ wmma_fast(const half* A, const half* B, float* C) {
             regB[i] = *reinterpret_cast<const uint4*>(&B[(size_t)(k0 + r) * N + blockCol + c * 8]);
         }
     };
-    auto storeShared = [&](int buf) {             // registers -> shared buffer
+    auto storeShared = [&](int buf) {             // registers - shared buffer
 #pragma unroll
         for (int i = 0; i < 2; i++) {
             int idx = tid + i * THREADS;
@@ -177,11 +162,11 @@ wmma_fast(const half* A, const half* B, float* C) {
         }
 
         // 3. put the prefetched tile into the OTHER buffer
-        //    (nobody reads it now: it was last read in iteration t-1,
+        //    (nobody reads it now- it was last read in iteration t-1,
         //     and everyone passed the barrier at the end of t-1)
         if (t + 1 < numTiles) storeShared(cur ^ 1);
 
-        // 4. one barrier per tile: next buffer complete AND current buffer
+        // 4. one barrier per tile- next buffer complete AND current buffer
         //    no longer being read before it is overwritten next iteration
         __syncthreads();
     }
@@ -195,7 +180,7 @@ wmma_fast(const half* A, const half* B, float* C) {
                 acc[i][j], N, wmma::mem_row_major);
 }
 
-// ------------------------------ timing --------------------------------
+//timing 
 template <typename F>
 float timeIt(F launch, int iters = 10) {
     for (int i = 0; i < 5; i++) launch();

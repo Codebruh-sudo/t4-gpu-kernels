@@ -1,25 +1,6 @@
-// =====================================================================
+
 // FLASHATTENTION FOR THE T4 — STAGE 2: tensor cores + per-tile rescale
-//
-//   O = softmax(Q K^T / sqrt(d)) V      layout [B*H][N][D], D = 64, fp16 in/out
-//
-// Block = 64 query rows, 4 warps. Each warp owns 16 query rows.
-// Per K/V tile (64 keys):
-//   1. load K tile and V tile into shared memory (whole block)
-//   2. S = Q K^T with WMMA (tensor cores). Q fragments stay in registers.
-//      K is loaded as a col_major matrix_b fragment = K^T, no transpose.
-//   3. online softmax on S (2 lanes per row, warp shuffle for the pair):
-//        tile max -> m_new, corr = exp(m_old - m_new)
-//        P = exp(S - m_new) (fp16), l = l*corr + rowsum(P)
-//        O rows *= corr     <- ONCE per tile (stage 1 did it per key)
-//   4. O += P V with WMMA (tensor cores)
-// End: O = O / l.
-//
-// Stage 1 (flash_v1) is included for comparison.
-//
-// compile:  nvcc -O3 -arch=sm_75 flash_v2.cu -o flash2
-// run:      ./flash2
-// =====================================================================
+
 
 #include <cstdio>
 #include <cstdlib>

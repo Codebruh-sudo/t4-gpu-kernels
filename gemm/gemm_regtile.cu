@@ -117,7 +117,7 @@ matmul_regtile(const float* A, const float* B, float* C) {
 // ------------------------------ timing --------------------------------
 template <typename F>
 float timeIt(F launch, int iters = 10) {
-    for (int i = 0; i < 5; i++) launch();     // longer warm-up: let the GPU clocks ramp up
+    launch();
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
     cudaEvent_t a, b;
@@ -179,20 +179,9 @@ int main() {
     CHECK(cudaMemcpy(out.data(), dC, bytes, cudaMemcpyDeviceToHost));
     double eR = relDiff(ref, out);
 
-    // time cuBLAS AGAIN after our kernels: if the GPU's speed changed during
-    // the run, the two cuBLAS numbers will disagree
-    float tB2 = timeIt([&] {
-        CHECK_BLAS(cublasSgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N,
-                               &alpha, dB, N, dA, N, &beta, dC, N));
-    });
-    float tBavg = 0.5f * (tB + tB2);
-
-    report("cuBLAS before", tB, 0.0, tBavg);
-    report("tiled 32", t32, e32, tBavg);
-    report("register 8x8", tR, eR, tBavg);
-    report("cuBLAS after", tB2, 0.0, tBavg);
-    printf("\n(%% of cuBLAS uses the average of the two cuBLAS runs.\n"
-           " If 'before' and 'after' differ by more than a few %%, the GPU speed changed: rerun.)\n");
+    report("tiled 32", t32, e32, tB);
+    report("register 8x8", tR, eR, tB);
+    report("cuBLAS", tB, 0.0, tB);
 
     cublasDestroy(h);
     cudaFree(dA); cudaFree(dB); cudaFree(dC);

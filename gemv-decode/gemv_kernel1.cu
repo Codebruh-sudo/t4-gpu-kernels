@@ -1,25 +1,5 @@
-// =====================================================================
-// T4 DECODE KERNELS — KERNEL 1: hand-written fp16 GEMV vs cuBLAS
-//
-//   y[n] = sum_k  W[n][k] * x[k]        N = K = 4096   (decode, M = 1)
-//
-// W is stored [N][K] (PyTorch layout): each output y[n] needs ONE
-// contiguous row of W.
-//
-// Design ("one warp per row"):
-//   - warp w computes y[w]
-//   - each lane loads 16 bytes at a time (uint4 = 8 halves)
-//     -> 32 lanes read 512 contiguous bytes  = perfectly coalesced
-//   - multiply in fp32, keep a private running sum
-//   - warp shuffle reduction -> lane 0 writes y[w]
-//
-// Goal: match cuBLAS fp16 (~0.135 ms, ~248 GB/s on the T4).
-//
-// compile:  nvcc -O3 -arch=sm_75 gemv_kernel1.cu -o gemv1 -lcublas
-// run:      ./gemv1
-// ncu:      ncu --kernel-name gemv_warp_per_row --launch-skip 5 --launch-count 1 \
-//               --metrics gpu__time_duration.sum,dram__throughput.avg.pct_of_peak_sustained_elapsed ./gemv1
-// =====================================================================
+
+// T4 DECODE KERNELS - KERNEL 1- hand-written fp16 GEMV VS cuBLAS
 
 #include <cstdio>
 #include <cstdlib>
@@ -40,7 +20,7 @@ constexpr int N = 4096;
 constexpr int THREADS = 256;                 // 8 warps per block = 8 rows per block
 constexpr int ROWS_PER_BLOCK = THREADS / 32;
 
-// ------------------------------ our kernel ---------------------------
+//  our kernel
 __global__ void gemv_warp_per_row(const __half* __restrict__ W,
                                   const __half* __restrict__ x,
                                   __half* __restrict__ y) {
@@ -74,7 +54,7 @@ __global__ void gemv_warp_per_row(const __half* __restrict__ W,
     if (lane == 0) y[row] = __float2half(acc);
 }
 
-// ------------------------------ cuBLAS --------------------------------
+// cuBLAS
 // Same layout trick as Stage 4: W[N][K] row-major -> OP_T in column-major.
 void gemvCublas(cublasHandle_t h, const __half* W, const __half* x, __half* y) {
     const float alpha = 1.0f, beta = 0.0f;
@@ -85,7 +65,7 @@ void gemvCublas(cublasHandle_t h, const __half* W, const __half* x, __half* y) {
         CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 }
 
-// ------------------------------ timing --------------------------------
+// timing
 template <typename F>
 float timeIt(F launch, int iters = 200) {
     for (int i = 0; i < 10; i++) launch();     // warm-up
@@ -114,7 +94,7 @@ double relError(const std::vector<float>& ref, const std::vector<__half>& got) {
 }
 
 int main() {
-    // ---------------- data ----------------
+    // data
     std::vector<__half> hW((size_t)N * K), hx(K);
     srand(42);
     for (auto& v : hW) v = __float2half((rand() / (float)RAND_MAX - 0.5f) * 0.1f);
@@ -147,14 +127,14 @@ int main() {
     printf("Weights = %.1f MB (far bigger than the 4 MB L2, so this measures DRAM)\n\n",
            2.0 * N * K / 1e6);
 
-    // ---- cuBLAS ----
+    // cuBLAS
     float tB = timeIt([&] { gemvCublas(h, dW, dx, dy); });
     CHECK(cudaMemcpy(out.data(), dy, N * sizeof(__half), cudaMemcpyDeviceToHost));
     double eB = relError(ref, out);
     printf("cuBLAS        %8.4f ms   %6.1f GB/s   rel. error %.2e\n",
            tB, bytes / (tB * 1e-3) / 1e9, eB);
 
-    // ---- ours ----
+    //  ours 
     CHECK(cudaMemset(dy, 0, N * sizeof(__half)));
     float tO = timeIt([&] { gemv_warp_per_row<<<blocks, THREADS>>>(dW, dx, dy); });
     CHECK(cudaMemcpy(out.data(), dy, N * sizeof(__half), cudaMemcpyDeviceToHost));

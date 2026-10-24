@@ -1,5 +1,5 @@
-// =====================================================================
-// Softmax optimization walkthrough — 4 versions, timed and verified.
+
+// Softmax optimization walkthrough - 4 versions, timed and verified.
 //
 // Problem: row-wise softmax on a [R x C] fp32 matrix (R = C = 4096).
 //
@@ -9,7 +9,7 @@
 // profile:  ncu --set full -k regex:softmax ./softmax_opt
 //           (look at: DRAM throughput %, L1/L2 hit rate, memory
 //            transactions per request, achieved occupancy)
-// =====================================================================
+
 
 #include <cstdio>
 #include <cstdlib>

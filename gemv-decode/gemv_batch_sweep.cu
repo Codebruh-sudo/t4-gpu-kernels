@@ -1,20 +1,5 @@
-// =====================================================================
-// T4 DECODE KERNELS — BATCH SWEEP: our GEMV-style kernels vs cuBLAS
-//
-//   Y[M][N] = X[M][K] * W[N][K]^T       N = K = 4096,  M = 1 ... 512
-//
-// Three contenders:
-//   cuBLAS      : picks GEMV / tensor-core GEMM depending on M
-//   v1 (naive)  : Kernel 1, one launch covers all tokens, but every token
-//                 re-reads the WHOLE weight matrix  -> W read M times
-//   v1b (reuse) : each warp loads a weight chunk ONCE and uses it for
-//                 8 tokens (TB = 8)                  -> W read M/8 times
-//
-// Question: where does the "motorbike" stop beating the "truck"?
-//
-// compile:  nvcc -O3 -arch=sm_75 gemv_batch_sweep.cu -o sweep -lcublas
-// run:      ./sweep
-// =====================================================================
+
+// T4 DECODE KERNELS - BATCH SWEEP- our GEMV-style kernels vs cuBLAS
 
 #include <cstdio>
 #include <cstdlib>
@@ -37,7 +22,7 @@ constexpr int THREADS = 256;                  // 8 warps = 8 rows per block
 constexpr int ROWS_PER_BLOCK = THREADS / 32;
 constexpr int TB = 8;                         // tokens per warp in v1b
 
-// ---------------- v1: Kernel 1, one token per blockIdx.y ----------------
+//  v1- Kernel 1, one token per blockIdx.y 
 __global__ void gemv_v1(const __half* __restrict__ W, const __half* __restrict__ X,
                         __half* __restrict__ Y) {
     int row  = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
@@ -66,7 +51,7 @@ __global__ void gemv_v1(const __half* __restrict__ W, const __half* __restrict__
     if (lane == 0) Y[(size_t)t * N + row] = __float2half(acc);
 }
 
-// ------------- v1b: load each weight chunk once, use it for TB tokens -------------
+// v1b: load each weight chunk once, use it for TB tokens
 __global__ void gemv_v1b(const __half* __restrict__ W, const __half* __restrict__ X,
                          __half* __restrict__ Y, int M) {
     int row  = (blockIdx.x * blockDim.x + threadIdx.x) / 32;
@@ -110,7 +95,7 @@ __global__ void gemv_v1b(const __half* __restrict__ W, const __half* __restrict_
     }
 }
 
-// ------------------------------ cuBLAS --------------------------------
+// cuBLAS
 void gemmCublas(cublasHandle_t h, int M, const __half* W, const __half* X, __half* Y) {
     const float alpha = 1.0f, beta = 0.0f;
     CHECK_BLAS(cublasGemmEx(h, CUBLAS_OP_T, CUBLAS_OP_N, N, M, K,
@@ -120,7 +105,7 @@ void gemmCublas(cublasHandle_t h, int M, const __half* W, const __half* X, __hal
         CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 }
 
-// ------------------------------ timing --------------------------------
+//  timing 
 template <typename F>
 float timeIt(F launch, int iters) {
     for (int i = 0; i < 3; i++) launch();                    // warm-up

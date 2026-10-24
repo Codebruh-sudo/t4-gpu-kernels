@@ -1,16 +1,4 @@
-# =====================================================================
-# PyTorch starter for the FlashAttention work (run in Colab on the T4)
-#
-# Part 1: the PyTorch basics you need (GPU tensors, @, softmax, timing,
-#         checking results)
-# Part 2: naive attention vs PyTorch's memory-efficient attention
-#         (the FlashAttention idea: tiles + online softmax, no N x N matrix)
-#         -> time AND memory as the sequence length N grows
-# Part 3: does Triton's tl.dot (tensor cores) work on this GPU?
-#         (Triton officially needs compute capability 8.0+, the T4 is 7.5)
-#
-# run in a Colab cell:   !python attention_starter.py
-# =====================================================================
+
 
 import math
 import torch
@@ -21,7 +9,7 @@ print("PyTorch", torch.__version__, "| GPU:", torch.cuda.get_device_name(0),
       "| compute capability", torch.cuda.get_device_capability(0))
 
 
-# ------------------------------- Part 1 --------------------------------
+#  Part 1 
 def time_ms(fn, iters=20):
     """Average GPU time of fn() in ms, using CUDA events (after warm-up)."""
     for _ in range(5):
@@ -55,7 +43,7 @@ def naive_attention(q, k, v):
     return p @ v
 
 
-# ------------------------------- Part 2 --------------------------------
+# part 2
 try:
     from torch.nn.attention import sdpa_kernel, SDPBackend
     def efficient_attention(q, k, v):
@@ -95,7 +83,7 @@ for N in [512, 1024, 2048, 4096, 8192]:
 print("\nExpect: naive memory grows ~N^2 (the score matrix); efficient grows ~N.")
 
 
-# ------------------------------- Part 3 --------------------------------
+# Part 3 
 print("\nPart 3: Triton tensor-core test (tl.dot) on this GPU")
 try:
     import triton

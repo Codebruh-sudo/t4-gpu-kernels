@@ -1,23 +1,23 @@
-// =====================================================================
-// FUSION EXAMPLE 2 (library): GEMM + bias + GELU via cuBLASLt epilogue
+
+// FUSION EXAMPLE 2 (library)- GEMM + bias + GELU via cuBLASLt epilogue
 //
-// The first half of every transformer FFN:   D = GELU(A * B + bias)
+// The first half of every transformer FFN-   D = GELU(A * B + bias)
 //
-// UNFUSED: cuBLASLt matmul writes D -> a separate kernel reads D,
+// UNFUSED- cuBLASLt matmul writes D - a separate kernel reads D,
 //          adds bias, applies GELU, writes D again   (2 launches,
 //          one extra read+write of D)
-// FUSED:   CUBLASLT_EPILOGUE_GELU_BIAS — bias + GELU are applied
+// FUSED-  CUBLASLT_EPILOGUE_GELU_BIAS - bias + GELU are applied
 //          while the tile is still in registers   (1 launch, D written once)
 //
 // The lesson: fusion saves the extra D traffic. Whether that matters
 // depends on how big that traffic is compared to the GEMM itself:
 //   - n = 4096 (prefill-like): GEMM is compute-heavy, gain is small
 //   - n = 64   (decode-like):  GEMM is tiny, the extra kernel and its
-//                              launch are a bigger fraction -> larger gain
+//                              launch are a bigger fraction - larger gain
 //
 // compile:  nvcc -O3 -arch=sm_75 fusion_gemm_bias_gelu_cublaslt.cu -o fusion_lt -lcublasLt
 // run:      ./fusion_lt
-// =====================================================================
+
 
 #include <cstdio>
 #include <cstdlib>
@@ -34,8 +34,8 @@
 #define CHECK_LT(x) do { cublasStatus_t s = (x); if (s != CUBLAS_STATUS_SUCCESS) { \
     printf("cuBLASLt error %d at %s:%d\n", (int)s, __FILE__, __LINE__); exit(1); } } while (0)
 
-// Column-major convention (cuBLAS):  D[m x n] = A[m x k] * B[k x n]
-// Think: m = output features, k = input features, n = tokens.
+// Column-major convention (cuBLAS)- D[m x n] = A[m x k] * B[k x n]
+// Think- m = output features, k = input features, n = tokens.
 // bias has one value per output feature (length m).
 constexpr int M = 4096, K = 4096;
 constexpr int MAX_N = 4096;

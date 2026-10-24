@@ -1,21 +1,5 @@
-// =====================================================================
-// LEARNING STEP 3: tensor cores with WMMA (fp16 in, fp32 accumulate)
-//
-//   C[N][N] (fp32) = A[N][N] (fp16) * B[N][N] (fp16)     row-major, N = 4096
-//
-// Contenders:
-//   wmma simple : each warp computes one 16x16 tile of C, loading its
-//                 A and B tiles straight from global memory (no reuse)
-//   wmma shared : block of 4 warps computes a 64x64 tile of C.
-//                 A and B tiles are staged in shared memory, and each warp
-//                 computes a 32x32 piece = 2x2 tensor-core tiles
-//   cuBLAS      : cublasGemmEx, fp16 in / fp32 out, tensor cores
-//
-// T4: fp16 tensor-core peak ~65 TFLOP/s (fp32 CUDA cores only ~8).
-//
-// compile:  nvcc -O3 -arch=sm_75 gemm_wmma.cu -o gemm_wmma -lcublas
-// run:      ./gemm_wmma
-// =====================================================================
+
+// LEARNING STEP 3- tensor cores with WMMA (fp16 in, fp32 accumulate)
 
 #include <cstdio>
 #include <cstdlib>

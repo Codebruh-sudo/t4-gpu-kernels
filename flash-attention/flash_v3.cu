@@ -1,26 +1,5 @@
-// =====================================================================
-// FLASHATTENTION FOR THE T4 — STAGE 3: occupancy + O in registers + prefetch
-//
-//   O = softmax(Q K^T / sqrt(d)) V      layout [B*H][N][D], D = 64, fp16 in/out
-//
-// Changes vs stage 2:
-//   1. OCCUPANCY: K/V tiles of 32 keys and O kept in registers
-//      -> ~18.7 KB shared memory per block (was ~52 KB)
-//      -> up to 3 blocks (12 warps) per SM instead of 1 block (4 warps)
-//   2. O IN REGISTERS: O lives in 4 tensor-core accumulator fragments per
-//      warp for the whole kernel (stage 2 loaded/stored it every tile).
-//      Per-row rescaling needs to know which row each fragment element
-//      belongs to: we discover it once by loading a 16x16 matrix whose
-//      value at (r, c) is r, and reading the fragment back ("row map").
-//   3. PREFETCH: the next K/V tile is loaded from global memory into
-//      registers while the current tile is being computed, then stored
-//      into shared memory (register-staged, like GEMM step 4).
-//
-// Stage 2 is included for comparison.
-//
-// compile:  nvcc -O3 -arch=sm_75 flash_v3.cu -o flash3
-// run:      ./flash3
-// =====================================================================
+
+// FLASHATTENTION FOR THE T4 -STAGE 3- occupancy + O in registers + prefetch
 
 #include <cstdio>
 #include <cstdlib>

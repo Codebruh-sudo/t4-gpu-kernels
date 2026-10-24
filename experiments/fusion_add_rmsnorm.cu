@@ -1,4 +1,4 @@
-// =====================================================================
+
 // FUSION EXAMPLE 1: residual add + RMSNorm  (every Llama-style layer)
 //
 //   h = x + residual                       (the residual stream)
@@ -8,9 +8,9 @@
 // y feeds the next matmul.
 //
 // UNFUSED = 3 kernels, every intermediate round-trips through DRAM:
-//   k1 add:    read x, read r, write h      -> 3 tensor passes
-//   k2 rms:    read h                       -> 1
-//   k3 scale:  read h, write y              -> 2
+//   k1 add:    read x, read r, write h      - 3 tensor passes
+//   k2 rms:    read h                       - 1
+//   k3 scale:  read h, write y              - 2
 //                                   total   =  6 tensor passes, 3 launches
 // FUSED = 1 kernel, h stays in registers between the steps:
 //   read x, read r, write h, write y        -> 4 tensor passes, 1 launch
@@ -22,7 +22,7 @@
 // run:      ./fusion_rms
 // profile:  nsys profile ./fusion_rms      (count the kernels)
 //           ncu --set full ./fusion_rms    (DRAM bytes per kernel)
-// =====================================================================
+
 
 #include <cstdio>
 #include <cstdlib>

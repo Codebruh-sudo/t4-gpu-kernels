@@ -1,29 +1,5 @@
-// =====================================================================
-// FLASHATTENTION FOR THE T4 — STAGE 1: correct first (CUDA cores)
-//
-//   O = softmax(Q K^T / sqrt(d)) V        per (batch, head)
-//   layout: [B*H][N][D] contiguous (same as PyTorch [B, H, N, D])
-//
-// The FlashAttention idea, in its simplest form:
-//   - one THREAD owns one query row: keeps q (64 values) and its running
-//     output o (64 values) in registers, plus running max m and sum l
-//   - a BLOCK of 64 threads = 64 query rows
-//   - K and V arrive TILE BY TILE (64 keys at a time) in shared memory
-//   - for every key: score s = q.k, then the ONLINE SOFTMAX update:
-//         m_new = max(m, s)
-//         corr  = exp(m - m_new)          (rescale everything seen so far)
-//         p     = exp(s - m_new)
-//         l     = l * corr + p
-//         o     = o * corr + p * v
-//   - at the end: O = o / l
-//   - the N x N score matrix NEVER exists
-//
-// Stage 1 is deliberately simple (fp32 math on CUDA cores, rescale per key).
-// It is the correctness baseline. Speed comes in stages 2-3 (tensor cores).
-//
-// compile:  nvcc -O3 -arch=sm_75 flash_v1.cu -o flash1
-// run:      ./flash1
-// =====================================================================
+
+// FLASHATTENTION FOR THE T4 - STAGE 1- correct first (CUDA cores)
 
 #include <cstdio>
 #include <cstdlib>
@@ -42,8 +18,8 @@ constexpr int D  = 64;     // head dimension
 constexpr int BR = 64;     // query rows per block (= threads per block)
 constexpr int BC = 64;     // keys per K/V tile
 
-// ------------------------------ kernel --------------------------------
-// grid: (N / BR, B*H)    block: BR threads
+// kernel
+// grid- (N / BR, B*H)    block: BR threads
 __global__ void __launch_bounds__(BR)
 flash_v1(const half* __restrict__ Q, const half* __restrict__ K,
          const half* __restrict__ V, half* __restrict__ O, int N, float scale) {
@@ -65,8 +41,8 @@ flash_v1(const half* __restrict__ Q, const half* __restrict__ K,
     float l = 0.0f;                                // running sum of exp
 
     for (int t0 = 0; t0 < N; t0 += BC) {
-        // ---- load one K tile and one V tile (64 keys x 64 dims) ----
-        //      neighbouring threads read neighbouring addresses -> coalesced
+        // load one K tile and one V tile (64 keys x 64 dims)       
+        // neighbouring threads read neighbouring addresses - coalesced
         for (int i = threadIdx.x; i < BC * D; i += BR) {
             int r = i / D, c = i % D;
             Ks[r][c] = __half2float(Kb[(size_t)(t0 + r) * D + c]);
@@ -74,9 +50,9 @@ flash_v1(const half* __restrict__ Q, const half* __restrict__ K,
         }
         __syncthreads();
 
-        // ---- process the 64 keys of this tile ----
+        //  process the 64 keys of this tile 
         for (int j = 0; j < BC; j++) {
-            // score = q . k_j   (every thread reads the same Ks[j][d] -> broadcast)
+            // score = q . k_j   (every thread reads the same Ks[j][d] - broadcast)
             float s = 0.0f;
 #pragma unroll
             for (int d = 0; d < D; d++) s += q[d] * Ks[j][d];
@@ -93,13 +69,13 @@ flash_v1(const half* __restrict__ Q, const half* __restrict__ K,
         __syncthreads();                           // tile used up before it is replaced
     }
 
-    // ---- final normalize and write ----
+    // final normalize and write
     half* op = O + ((size_t)bh * N + row) * D;
 #pragma unroll
     for (int d = 0; d < D; d++) op[d] = __float2half(o[d] / l);
 }
 
-// ------------------------------ helpers --------------------------------
+// helpers 
 template <typename F>
 float timeIt(F launch, int iters = 10) {
     for (int i = 0; i < 3; i++) launch();

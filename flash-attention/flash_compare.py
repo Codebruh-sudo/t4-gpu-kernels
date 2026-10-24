@@ -1,18 +1,8 @@
-# =====================================================================
-# FAIR COMPARISON: your FlashAttention (stage 3) vs PyTorch, same run
-#
-# - compiles flash_v3 INSIDE PyTorch (load_inline) -> callable as flash(q, k, v)
-# - times your kernel and PyTorch's memory-efficient SDPA kernel in
-#   ALTERNATING rounds on the same GPU, and reports the MEDIAN
-#   (so a GPU clock change affects both equally)
-# - checks correctness against an fp32 reference and against PyTorch
-#
-# run in Colab:   !python flash_compare.py
-# (first run compiles the kernel: about 1-2 minutes)
-# =====================================================================
+
+# FAIR COMPARISON- your FlashAttention (stage 3) vs PyTorch, same run
 
 import os
-os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "7.5")   # T4: compile only for sm_75 (faster build)
+os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "7.5")   # T4- compile only for sm_75 (faster build)
 
 import math
 import statistics

@@ -22,7 +22,7 @@ FlashAttention-2 does not support Turing GPUs. This folder builds a FlashAttenti
 | 2 | WMMA tensor cores, rescale once per tile instead of per key | ~15 ms | 9.1 |
 | 3 | 3 blocks per SM (was 1), O in registers, K/V prefetch | 8.8 ms | 15.7 |
 
-All stages: max error ~1e-5 against an exact CPU calculation.
+All stage- max error ~1e-5 against an exact CPU calculation.
 
 ### What changed in stage 3
 
