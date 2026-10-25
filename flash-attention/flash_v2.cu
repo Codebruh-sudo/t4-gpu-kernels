@@ -1,5 +1,5 @@
 
-// FLASHATTENTION FOR THE T4 -- STAGE 2- tensor cores + per-tile rescale
+// FLASHATTENTION FOR THE T4 - STAGE 2- tensor cores + per-tile rescale
 
 
 #include <cstdio>
