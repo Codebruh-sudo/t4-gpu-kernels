@@ -22,7 +22,7 @@ constexpr int BR = 64;                  // query rows per block (both stages)
 constexpr int WARPS   = 4;
 constexpr int THREADS = WARPS * 32;     // 128
 
-// ============================ stage 2 (unchanged) =======================
+//  stage 2 (unchanged) 
 namespace s2 {
 constexpr int BC  = 64;
 constexpr int LDK = D + 8, LDS = BC + 4, LDP = BC + 8, LDO = D + 4;
@@ -114,7 +114,7 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
 }
 }  // namespace s2
 
-// ============================ stage 3 ==================================
+//  stage 3 
 constexpr int BC  = 32;                 // keys per tile (smaller -> less shared memory)
 constexpr int LDK = D + 8;              // 72 halves  (K, V tiles)
 constexpr int LDS = BC + 4;             // 36 floats  (S tile)
@@ -150,7 +150,7 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
     half*  Pw    = reinterpret_cast<half*>(Sw);     // P reuses it
     float* corrW = CorrS + warp * 16;               // per-row factors for this warp
 
-    // ---- row map: which row does each accumulator element belong to? ----
+    // row map: which row does each accumulator element belong to? ----
     //      load a 16x16 matrix whose value at (r, c) is r, then read it back
     for (int idx = lane; idx < 256; idx += 32) Sw[(idx / 16) * LDS + (idx % 16)] = (float)(idx / 16);
     __syncwarp();
@@ -161,23 +161,23 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
     for (int i = 0; i < 8; i++) rowOf[i] = (int)rowFrag.x[i];
     __syncwarp();
 
-    // ---- Q fragments (registers, whole kernel) ----
+    //  Q fragments (registers, whole kernel) 
     wmma::fragment<wmma::matrix_a, 16, 16, 16, half, wmma::row_major> qf[D / 16];
     const half* Qw = Q + ((size_t)bh * N + row0 + warp * 16) * D;
 #pragma unroll
     for (int kk = 0; kk < D / 16; kk++) wmma::load_matrix_sync(qf[kk], Qw + kk * 16, D);
 
-    // ---- O accumulators (registers, whole kernel): 16 rows x 64 dims = 4 fragments ----
+    //  O accumulators (registers, whole kernel): 16 rows x 64 dims = 4 fragments 
     wmma::fragment<wmma::accumulator, 16, 16, 16, float> oacc[D / 16];
 #pragma unroll
     for (int c = 0; c < D / 16; c++) wmma::fill_fragment(oacc[c], 0.0f);
 
-    // ---- softmax bookkeeping: 2 lanes per row, 16 columns each ----
+    //  softmax bookkeeping: 2 lanes per row, 16 columns each 
     const int r = lane >> 1;
     const int h = lane & 1;
     float m_r = -INFINITY, l_r = 0.0f;
 
-    // ---- K/V prefetch registers: each tile is 32x64 halves = 256 chunks of 16 B -> 2 per thread ----
+    //  K/V prefetch registers: each tile is 32x64 halves = 256 chunks of 16 B -> 2 per thread 
     uint4 kReg[2], vReg[2];
     auto loadKV = [&](int t0) {
 #pragma unroll
@@ -196,7 +196,7 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
         }
     };
 
-    // prologue: tile 0 into shared memory
+    // prologue- tile 0 into shared memory
     loadKV(0);
     storeKV();
     __syncthreads();
@@ -205,7 +205,7 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
         const bool hasNext = (t0 + BC < N);
         if (hasNext) loadKV(t0 + BC);               // next tile travels while we compute
 
-        // ---------- S = Q K^T  (16 rows x 32 keys per warp) ----------
+        //  S = Q K^T  (16 rows x 32 keys per warp) 
 #pragma unroll
         for (int j = 0; j < BC / 16; j++) {
             wmma::fragment<wmma::accumulator, 16, 16, 16, float> sacc;
@@ -220,7 +220,7 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
         }
         __syncwarp();
 
-        // ---------- online softmax for this tile ----------
+        //  online softmax for this tile 
         float sv[16], mx = -INFINITY;
 #pragma unroll
         for (int c = 0; c < 16; c++) {
@@ -271,7 +271,7 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
         }
     }
 
-    // ---------- final: O / l, staged through shared memory, write fp16 ----------
+    //  final- O / l, staged through shared memory, write fp16 
     if (h == 0) corrW[r] = 1.0f / l_r;
     __syncwarp();
 #pragma unroll
@@ -290,7 +290,7 @@ flash_v3(const half* __restrict__ Q, const half* __restrict__ K,
     for (int c = 0; c < 32; c++) Og[c] = __float2half(Ostage[r * D + h * 32 + c]);
 }
 
-// ============================ helpers ==================================
+//  helpers 
 template <typename F>
 float timeIt(F launch, int iters = 20) {
     for (int i = 0; i < 5; i++) launch();
