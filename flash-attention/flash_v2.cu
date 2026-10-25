@@ -1,5 +1,5 @@
 
-// FLASHATTENTION FOR THE T4 — STAGE 2: tensor cores + per-tile rescale
+// FLASHATTENTION FOR THE T4 -- STAGE 2- tensor cores + per-tile rescale
 
 
 #include <cstdio>
@@ -22,7 +22,7 @@ constexpr int D  = 64;
 constexpr int BR = 64;           // query rows per block
 constexpr int BC = 64;           // keys per tile
 
-// ============================ stage 1 ==================================
+//  stage 1
 __global__ void __launch_bounds__(BR)
 flash_v1(const half* __restrict__ Q, const half* __restrict__ K,
          const half* __restrict__ V, half* __restrict__ O, int N, float scale) {
@@ -60,7 +60,7 @@ flash_v1(const half* __restrict__ Q, const half* __restrict__ K,
     for (int d = 0; d < D; d++) op[d] = __float2half(o[d] / l);
 }
 
-// ============================ stage 2 ==================================
+// stage 2
 constexpr int WARPS   = 4;
 constexpr int THREADS = WARPS * 32;     // 128
 constexpr int LDK = D + 8;              // 72 halves  (K and V tiles, padded)
@@ -104,7 +104,7 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
 #pragma unroll
     for (int kk = 0; kk < D / 16; kk++) wmma::load_matrix_sync(qf[kk], Qw + kk * 16, D);
 
-    // ---- softmax bookkeeping: 2 lanes per row ----
+    // softmax bookkeepin- 2 lanes per row -
     const int r = lane >> 1;          // row 0..15 within this warp
     const int h = lane & 1;           // which half of the 64 columns (32 each)
     float m_r = -INFINITY;            // running max of row r   (both lanes keep a copy)
@@ -115,7 +115,7 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
     __syncwarp();
 
     for (int t0 = 0; t0 < N; t0 += BC) {
-        // ---------- 1. load K and V tiles (64 x 64 halves each) ----------
+        //            1. load K and V tiles (64 x 64 halves each) 
         //            512 chunks of 16 bytes each -> 4 per thread, coalesced
 #pragma unroll
         for (int i = 0; i < 4; i++) {
@@ -128,7 +128,7 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
         }
         __syncthreads();
 
-        // ---------- 2. S = Q K^T on tensor cores (16 rows x 64 keys per warp) ----------
+        // 2. S = Q K^T on tensor cores (16 rows x 64 keys per warp) 
 #pragma unroll
         for (int j = 0; j < BC / 16; j++) {
             wmma::fragment<wmma::accumulator, 16, 16, 16, float> sacc;
@@ -144,7 +144,7 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
         }
         __syncwarp();
 
-        // ---------- 3. online softmax, once per tile ----------
+        //  3. online softmax, once per tile 
         float sv[32];
         float mx = -INFINITY;
 #pragma unroll
@@ -173,7 +173,7 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
         for (int c = 0; c < 32; c++) Ow[r * LDO + h * 32 + c] *= corr;   // rescale ONCE per tile
         __syncwarp();
 
-        // ---------- 4. O += P V on tensor cores (16 rows x 64 dims per warp) ----------
+        //  4. O += P V on tensor cores (16 rows x 64 dims per warp) 
 #pragma unroll
         for (int c = 0; c < D / 16; c++) {
             wmma::fragment<wmma::accumulator, 16, 16, 16, float> oacc;
@@ -192,14 +192,14 @@ flash_v2(const half* __restrict__ Q, const half* __restrict__ K,
         __syncthreads();      // everyone done with K/V before the next tile overwrites them
     }
 
-    // ---------- final: O = O / l, write fp16 ----------
+    //  final- O = O / l, write fp16 
     half* Og = O + ((size_t)bh * N + row0 + warp * 16 + r) * D + h * 32;
     float inv = 1.0f / l_r;
 #pragma unroll
     for (int c = 0; c < 32; c++) Og[c] = __float2half(Ow[r * LDO + h * 32 + c] * inv);
 }
 
-// ============================ helpers ==================================
+//  helpers 
 template <typename F>
 float timeIt(F launch, int iters = 10) {
     for (int i = 0; i < 3; i++) launch();
