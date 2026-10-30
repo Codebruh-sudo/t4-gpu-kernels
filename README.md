@@ -4,7 +4,7 @@ Hand-written CUDA kernels for AI workloads on the NVIDIA Tesla T4 (Turing, sm_75
 
 ## Highlights
 
-- **FlashAttention forward for Turing**, written in CUDA because FlashAttention-2 does not support sm_75. Built in three stages, from 2.2 to 15.4 TFLOP/s. In a same-run, alternating benchmark it is 5–12% faster than PyTorch's memory-efficient attention kernel for sequences of 1024 tokens and longer, with errors around 1e-5. → [`flash-attention/`](flash-attention/)
+- **FlashAttention forward for Turing**, written in CUDA because FlashAttention-2 does not support sm_75. Built in three stages, from 2.2 to 15.4 TFLOP/s. In a same-run, alternating benchmark it is 5–12% faster than PyTorch's memory-efficient attention kernel for sequences of 1024 tokens and longer, with errors around 1e-5. - [`flash-attention/`](flash-attention/)
 - **Batch-1 decode GEMV**, one warp per row: 265 GB/s (~83% of peak bandwidth), 1.07× faster than cuBLAS at batch 1, because cuBLAS uses split-K plus a separate reduction kernel there. A batch sweep shows where it stops winning. → [`gemv-decode/`](gemv-decode/)
 - **GEMM from naive to tensor cores**: 0.44 to 17.9 TFLOP/s (about 40×) through shared-memory tiling, register tiling, WMMA tensor cores, larger warp tiles and double buffering. Output is bit-identical to cuBLAS. → [`gemm/`](gemm/)
 
@@ -31,8 +31,8 @@ Like all FlashAttention variants, it never builds the N×N score matrix. At N = 
 | Folder | What it is | Key result |
 |---|---|---|
 | [`flash-attention/`](flash-attention/) | FlashAttention forward for the T4, stages 1–3 plus a fair PyTorch comparison | 1.05–1.12× vs PyTorch for N ≥ 1024 |
-| [`gemv-decode/`](gemv-decode/) | Batch-1 decode GEMV plus a batch-size sweep (M = 1 → 512) | 1.07× vs cuBLAS at batch 1 |
-| [`gemm/`](gemm/) | GEMM optimization ladder, fp32 CUDA cores → fp16 tensor cores | 17.9 TFLOP/s, ~60% of cuBLAS |
+| [`gemv-decode/`](gemv-decode/) | Batch-1 decode GEMV plus a batch-size sweep (M = 1 - 512) | 1.07× vs cuBLAS at batch 1 |
+| [`gemm/`](gemm/) | GEMM optimization ladder, fp32 CUDA cores - fp16 tensor cores | 17.9 TFLOP/s, ~60% of cuBLAS |
 | [`cublas-studies/`](cublas-studies/) | Profiling cuBLAS FFN GEMMs: decode vs prefill, fp16 vs int8 | memory- vs compute-bound with Nsight Compute |
 | [`experiments/`](experiments/) | Softmax and fusion kernels | not yet benchmarked |
 
@@ -46,12 +46,12 @@ Like all FlashAttention variants, it never builds the N×N score matrix. At N = 
 
 ## Hardware and software
 
-- NVIDIA Tesla T4 (Google Colab): 40 SMs, 320 GB/s, 16 GB, compute capability 7.5
+- NVIDIA Tesla T4 (Google Colab)- 40 SMs, 320 GB/s, 16 GB, compute capability 7.5
 - CUDA (`nvcc -O3 -arch=sm_75`), PyTorch 2.11.0+cu130, Triton 3.6.0
 
 ## How to run
 
-Each CUDA file is a standalone benchmark:
+Each CUDA file is a standalone benchmark-
 
 ```bash
 nvcc -O3 -arch=sm_75 flash-attention/flash_v3.cu -o flash3 && ./flash3
